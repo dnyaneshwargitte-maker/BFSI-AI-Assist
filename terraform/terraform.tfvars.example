@@ -1,0 +1,20 @@
+# AWS Configuration
+aws_region    = "ap-south-1" # Mumbai (or us-east-1)
+project_name  = "bfsi-ai-assist"
+environment   = "poc"
+
+# EC2 Sizing (FinOps Cost-Optimized)
+instance_type = "t3.medium" # 2 vCPU, 4GB RAM (~$0.0416/hr)
+volume_size   = 30          # 30 GB gp3
+
+# SSH Key Pair Name (Already created in your AWS Console)
+key_name      = "your-aws-key-pair"
+
+# Restrict SSH (Replace with your actual IP, e.g. "122.161.45.10/32")
+allowed_ssh_cidr = "0.0.0.0/0"
+
+# PostgreSQL Credentials for Docker
+postgres_db       = "bfsi_db"
+postgres_user     = "postgres"
+postgres_password = "bfsi_secure_pass_2025"
+

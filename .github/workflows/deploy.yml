@@ -1,0 +1,55 @@
+name: Deploy BFSI AI Assist to AWS EC2
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  terraform-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+
+      - name: Terraform Init & Apply
+        id: tf
+        run: |
+          cd terraform
+          terraform init
+          terraform apply -auto-approve
+          echo "EC2_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_OUTPUT
+
+      - name: Deploy Docker Stack to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ steps.tf.outputs.EC2_IP }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          script: |
+            sudo mkdir -p /opt/bfsi-ai-assist
+            sudo chown -R ubuntu:ubuntu /opt/bfsi-ai-assist
+            cd /opt/bfsi-ai-assist
+
+            # Pull latest changes or rsync
+            git pull origin main || true
+
+            # Run Docker Compose (PostgreSQL in Docker + FastAPI + Nginx)
+            docker compose down || true
+            docker compose up --build -d
+
+            # Verify PostgreSQL 13 tables in Docker
+            docker compose exec -T postgres psql -U postgres -d bfsi_db -c "\dt"
+

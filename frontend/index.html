@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudifyOps BFSI Enterprise | Gateway</title>
+  <link rel="icon" type="image/png" href="/cloudifyops_logo.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              teal: '#0097B2',
+              green: '#28A745',
+              dark: '#0B192C',
+              navy: '#1E3E62'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 py-4 px-6 shadow-sm">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <img src="/cloudifyops_logo.png" alt="CloudifyOps Logo" class="h-12 object-contain" />
+        <div class="border-l border-slate-200 pl-3">
+          <span class="text-[10px] font-extrabold uppercase tracking-widest text-brand-teal bg-teal-50 px-2 py-0.5 rounded">BFSI Enterprise</span>
+          <h1 class="text-sm font-bold text-slate-900 leading-tight">Indian Banking & Insurance Telephony Gateway</h1>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2 text-xs font-semibold text-slate-500">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+        <span>PostgreSQL 15 Connected</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Hero & Two Distinct Portals -->
+  <main class="flex-1 max-w-6xl w-full mx-auto p-6 sm:p-10 flex flex-col justify-center space-y-10">
+    
+    <div class="text-center space-y-3 max-w-2xl mx-auto">
+      <div class="inline-flex items-center space-x-2 bg-teal-50 border border-teal-200 text-brand-teal px-3 py-1 rounded-full text-xs font-bold">
+        <i data-lucide="shield-check" class="w-4 h-4"></i>
+        <span>Separated Dedicated Portals</span>
+      </div>
+      <h2 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+        CloudifyOps BFSI Intelligence Platform
+      </h2>
+      <p class="text-sm text-slate-600 leading-relaxed">
+        Select your portal below. Customer and Agent environments are completely separated with independent logins, real-time WebRTC audio calling, and live speech analytics.
+      </p>
+    </div>
+
+    <!-- 2 Main Doorways -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      
+      <!-- Door 1: Customer Portal -->
+      <div class="bg-white rounded-3xl p-8 border-2 border-slate-200 hover:border-brand-teal transition-all shadow-lg hover:shadow-xl flex flex-col justify-between space-y-6 group">
+        <div class="space-y-4">
+          <div class="w-16 h-16 rounded-2xl bg-teal-50 text-brand-teal flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+            <i data-lucide="user-check" class="w-8 h-8"></i>
+          </div>
+          <div>
+            <span class="text-xs font-extrabold uppercase text-brand-teal tracking-wider">Policyholders & Insureds</span>
+            <h3 class="text-2xl font-bold text-slate-900 mt-1">Customer Portal</h3>
+          </div>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Dedicated customer self-service center. View active policies (Health, Motor, Life, PA), track claims, find cashless empanelled hospitals, and initiate direct WebRTC voice calls to agents.
+          </p>
+          
+          <ul class="space-y-2 text-xs text-slate-600 pt-2 border-t border-slate-100">
+            <li class="flex items-center space-x-2">
+              <i data-lucide="check" class="w-4 h-4 text-emerald-600"></i>
+              <span>Customer Login & 5 Indian Seeded Personas</span>
+            </li>
+            <li class="flex items-center space-x-2">
+              <i data-lucide="check" class="w-4 h-4 text-emerald-600"></i>
+              <span>Live Agent Presence (Active / Busy / Offline)</span>
+            </li>
+            <li class="flex items-center space-x-2">
+              <i data-lucide="check" class="w-4 h-4 text-emerald-600"></i>
+              <span>1-Click WebRTC Call to Licensed Agents</span>
+            </li>
+          </ul>
+        </div>
+
+        <a href="/customer" class="w-full py-3.5 bg-gradient-to-r from-brand-teal to-emerald-600 hover:from-brand-teal hover:to-emerald-700 text-white rounded-2xl font-bold text-sm shadow-md flex items-center justify-center space-x-2 transition-all">
+          <span>Launch Customer Portal</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </a>
+      </div>
+
+      <!-- Door 2: Agent Assist CRM -->
+      <div class="bg-slate-900 rounded-3xl p-8 border-2 border-slate-800 hover:border-brand-teal transition-all shadow-xl flex flex-col justify-between space-y-6 group text-white">
+        <div class="space-y-4">
+          <div class="w-16 h-16 rounded-2xl bg-slate-800 text-brand-teal flex items-center justify-center font-bold group-hover:scale-105 transition-transform border border-slate-700">
+            <i data-lucide="headset" class="w-8 h-8"></i>
+          </div>
+          <div>
+            <span class="text-xs font-extrabold uppercase text-brand-teal tracking-wider">Contact Center Operators</span>
+            <h3 class="text-2xl font-bold text-white mt-1">Agent Assist CRM</h3>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Enterprise workbench for 3 demo specialists (Health, Motor, Banking Fraud). Includes incoming call softphone ringing, 360° caller screen-pop, live Hinglish speech analytics, and Bedrock summaries.
+          </p>
+          
+          <ul class="space-y-2 text-xs text-slate-300 pt-2 border-t border-slate-800">
+            <li class="flex items-center space-x-2">
+              <i data-lucide="check" class="w-4 h-4 text-brand-teal"></i>
+              <span>Agent Login (Priya Nair, Amit Verma, Sneha Kulkarni)</span>
+            </li>
+            <li class="flex items-center space-x-2">
+              <i data-lucide="check" class="w-4 h-4 text-brand-teal"></i>
+              <span>Real-time Ringing Softphone & Accept Call</span>
+            </li>
+            <li class="flex items-center space-x-2">
+              <i data-lucide="check" class="w-4 h-4 text-brand-teal"></i>
+              <span>Authoritative RBI/IRDAI Rules & Bedrock Claude 3.5</span>
+            </li>
+          </ul>
+        </div>
+
+        <a href="/agent" class="w-full py-3.5 bg-brand-teal hover:bg-brand-teal/90 text-white rounded-2xl font-bold text-sm shadow-lg flex items-center justify-center space-x-2 transition-all">
+          <span>Launch Agent Assist CRM</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Testing Tip Box -->
+    <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs text-blue-900 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <i data-lucide="info" class="w-5 h-5 text-brand-teal shrink-0"></i>
+        <span><strong>Testing Tip:</strong> Open <strong>Customer Portal</strong> in one browser tab and <strong>Agent CRM</strong> in another browser tab (or side-by-side window). Click "Call Agent" from the customer tab and answer it in the agent tab!</span>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
+    CloudifyOps BFSI Shield • Multilingual Speech Analytics Architecture (RBI & IRDAI Compliant)
+  </footer>
+
+  <script>lucide.createIcons();</script>
+</body>
+</html>

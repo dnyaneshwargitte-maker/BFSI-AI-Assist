@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudifyOps BFSI LCA | Real-Time Agent Assist & CRM</title>
+  <link rel="icon" type="image/png" href="/cloudifyops_logo.png">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              teal: '#0097B2',
+              green: '#28A745',
+              dark: '#0B192C',
+              navy: '#1E3E62',
+              surface: '#F8FAFC',
+              accent: '#00B4D8'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 0.3; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .call-pulse {
+      animation: pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+    .wave-bar {
+      animation: wave 1.2s ease-in-out infinite;
+    }
+    @keyframes wave {
+      0%, 100% { height: 6px; }
+      50% { height: 26px; }
+    }
+  </style>
+</head>
+<body class="bg-brand-surface text-slate-800 min-h-screen flex flex-col font-sans antialiased">
+  <audio id="agent-remote-audio" autoplay playsinline></audio>
+
+  <!-- ========================================================================= -->
+  <!-- 1. TOP HEADER & SOFTPHONE BAR -->
+  <!-- ========================================================================= -->
+  <header class="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-50 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center space-x-4">
+        <a href="/" class="flex items-center space-x-3">
+          <img src="/cloudifyops_logo.png" alt="CloudifyOps Logo" class="h-11 object-contain brightness-125" />
+        </a>
+        <div class="hidden sm:block border-l border-slate-700 pl-4">
+          <div class="flex items-center space-x-2">
+            <span class="text-[10px] font-extrabold uppercase tracking-widest text-brand-teal bg-teal-950/60 border border-teal-800 px-2 py-0.5 rounded">Real-Time Agent Assist</span>
+            <span class="text-[10px] text-slate-400">AWS LCA • Bedrock Claude 3.5 Sonnet</span>
+          </div>
+          <h1 class="text-sm font-bold text-white leading-tight">Live Call Analytics & CRM Intelligence Workbench</h1>
+        </div>
+      </div>
+
+      <!-- Agent Controls & Softphone Presence -->
+      <div class="flex items-center space-x-3">
+        
+        <!-- Live Call Active Pill -->
+        <div id="call-active-badge" class="hidden flex items-center bg-emerald-950 border border-emerald-700 text-emerald-300 px-3.5 py-1.5 rounded-xl space-x-2 animate-pulse">
+          <i data-lucide="phone-call" class="w-4 h-4 text-emerald-400"></i>
+          <span class="text-xs font-mono font-bold" id="call-header-timer">00:00</span>
+          <button onclick="hangupCurrentCall()" class="bg-rose-600 hover:bg-rose-700 text-white p-1 rounded-lg shadow-sm" title="End Call">
+            <i data-lucide="phone-off" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+
+        <!-- Agent Selector Dropdown -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 flex items-center space-x-2">
+          <div class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></div>
+          <select id="select-agent-identity" onchange="onSwitchAgent(this.value)" class="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer">
+            <option value="AGT-101">Agent Priya Nair (Ext 101 - Health & PA)</option>
+            <option value="AGT-102">Agent Amit Verma (Ext 102 - Motor & Lending)</option>
+            <option value="AGT-103">Agent Sneha Kulkarni (Ext 103 - Banking Fraud)</option>
+          </select>
+        </div>
+
+        <!-- Presence Toggle (Available / Busy / Break) -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 flex items-center space-x-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400" id="presence-indicator-dot"></span>
+          <select id="select-agent-presence" onchange="onPresenceChange(this.value)" class="bg-transparent text-xs font-bold text-slate-300 focus:outline-none cursor-pointer">
+            <option value="available" class="bg-slate-900 text-white">🟢 Ready for Calls</option>
+            <option value="on_call" class="bg-slate-900 text-white">🟡 In Call (Busy)</option>
+            <option value="break" class="bg-slate-900 text-white">☕ Short Break</option>
+            <option value="offline" class="bg-slate-900 text-white">🔴 Offline</option>
+          </select>
+        </div>
+
+        <a href="/customer" target="_blank" class="text-xs font-bold text-slate-400 hover:text-brand-teal px-3 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 transition-all flex items-center space-x-1">
+          <span>Customer Tab ↗</span>
+        </a>
+
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- 2. INCOMING CALL TOAST MODAL (RINGS WHEN CUSTOMER CALLS) -->
+  <!-- ========================================================================= -->
+  <div id="incoming-call-modal" class="hidden fixed bottom-6 right-6 z-50 bg-slate-900 text-white rounded-3xl shadow-2xl border-2 border-brand-teal p-5 max-w-sm w-full animate-bounce">
+    <div class="flex items-start space-x-3">
+      <div class="w-12 h-12 bg-teal-950 border border-brand-teal rounded-full flex items-center justify-center text-brand-teal call-pulse">
+        <i data-lucide="phone-incoming" class="w-6 h-6"></i>
+      </div>
+      <div class="flex-1">
+        <span class="text-[10px] uppercase font-extrabold text-brand-teal tracking-wider block">Inbound Customer Call</span>
+        <h3 id="incoming-caller-name" class="font-bold text-white text-base">Rajesh Sharma</h3>
+        <p id="incoming-caller-phone" class="text-xs text-slate-400 font-mono">+91 98201 55412</p>
+        <p id="incoming-caller-reason" class="text-[11px] text-amber-400 font-semibold mt-1">Calling Contact Center...</p>
+      </div>
+    </div>
+    <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-end space-x-2">
+      <button onclick="declineCall()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all">
+        Decline
+      </button>
+      <button onclick="acceptCall()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md flex items-center space-x-1.5 transition-all">
+        <i data-lucide="phone" class="w-3.5 h-3.5"></i>
+        <span>Accept & Launch Assist</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 3. MAIN WORKBENCH -->
+  <!-- ========================================================================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+    
+    <!-- Standby State (When no call is active) -->
+    <div id="standby-banner" class="bg-white rounded-3xl p-10 border border-slate-200 shadow-sm text-center space-y-4">
+      <div class="w-16 h-16 rounded-2xl bg-teal-50 text-brand-teal mx-auto flex items-center justify-center font-bold">
+        <i data-lucide="headset" class="w-8 h-8"></i>
+      </div>
+      <div class="max-w-md mx-auto space-y-2">
+        <h2 class="text-xl font-bold text-slate-900">Agent Assist Softphone is Online</h2>
+        <p class="text-xs text-slate-500 leading-relaxed">
+          Open the <a href="/customer" target="_blank" class="text-brand-teal font-bold underline">Customer Portal tab</a> and click <strong>"Call Agent (WebRTC)"</strong>. 
+          Your screen will ring, and when you accept, the <strong>Real-Time Agent Assist</strong> and <strong>Caller CRM Screen-Pop</strong> will immediately activate side-by-side.
+        </p>
+      </div>
+      <div class="flex items-center justify-center space-x-2 pt-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+        <span class="text-xs font-bold text-emerald-700" id="standby-agent-status">Priya Nair (Ext 101) — Ready to Receive Calls</span>
+      </div>
+    </div>
+
+    <!-- Active Call Container: Left = Real-Time Agent Assist (Voice + Speech Stream + Bedrock); Right = Caller CRM Data Aside -->
+    <div id="active-call-workspace" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- LEFT: REAL-TIME AGENT ASSIST & LIVE SPEECH ANALYTICS (6 Cols) -->
+      <div class="lg:col-span-6 space-y-6">
+        
+        <!-- Voice Softphone & Live Audio Indicator -->
+        <div class="bg-slate-900 text-white rounded-3xl p-5 border border-slate-800 shadow-xl space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="text-xs font-bold text-emerald-400">WebRTC Live Voice Session</span>
+            </div>
+            <span class="font-mono text-xs font-bold text-white bg-slate-800 px-3 py-1 rounded-full border border-slate-700" id="call-box-timer">
+              00:00
+            </span>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-teal to-emerald-500 flex items-center justify-center text-white text-lg font-extrabold shadow-md" id="caller-avatar-circle">
+                RS
+              </div>
+              <div>
+                <h3 class="text-base font-bold text-white" id="caller-display-name">Rajesh Sharma</h3>
+                <p class="text-xs text-slate-400 font-mono" id="caller-display-phone">+91 98201 55412</p>
+              </div>
+            </div>
+
+            <!-- Waveform Simulation -->
+            <div class="flex items-center space-x-1.5 h-8">
+              <div class="w-1 bg-brand-teal rounded-full wave-bar" style="animation-delay: 0.1s"></div>
+              <div class="w-1 bg-emerald-400 rounded-full wave-bar" style="animation-delay: 0.3s"></div>
+              <div class="w-1 bg-brand-teal rounded-full wave-bar" style="animation-delay: 0.2s"></div>
+              <div class="w-1 bg-teal-300 rounded-full wave-bar" style="animation-delay: 0.4s"></div>
+              <div class="w-1 bg-emerald-500 rounded-full wave-bar" style="animation-delay: 0.15s"></div>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800">
+            <button id="btn-agent-mute" onclick="toggleMute()" class="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center space-x-1.5 text-xs font-bold transition-all">
+              <i data-lucide="mic" class="w-4 h-4" id="icon-mute-state"></i>
+              <span>Mute</span>
+            </button>
+            <button onclick="toggleHold()" id="btn-agent-hold" class="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center space-x-1.5 text-xs font-bold transition-all">
+              <i data-lucide="pause-circle" class="w-4 h-4"></i>
+              <span>Hold</span>
+            </button>
+            <button onclick="hangupCurrentCall()" class="py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center space-x-1.5 text-xs font-bold transition-all shadow-md">
+              <i data-lucide="phone-off" class="w-4 h-4"></i>
+              <span>End Call</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Real-Time Speech Stream & Diarization Box (AWS LCA Engine) -->
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col h-[380px]">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-brand-teal animate-ping"></span>
+              <h4 class="font-bold text-slate-900 text-sm">Real-Time Speech Stream (Hinglish/Hindi/English)</h4>
+            </div>
+            <!-- Sentiment Badge -->
+            <span id="live-sentiment-pill" class="text-[11px] font-extrabold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 uppercase">
+              POSITIVE
+            </span>
+          </div>
+
+          <!-- Utterance Stream Container -->
+          <div id="assist-speech-stream" class="flex-1 overflow-y-auto space-y-3 pr-2 custom-scroll">
+            <!-- Dynamically streamed -->
+          </div>
+
+          <div class="border-t border-slate-100 pt-2 flex items-center justify-between text-[11px] text-slate-400">
+            <span class="flex items-center space-x-1">
+              <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-400"></i>
+              <span>PII Masked: Aadhaar, PAN, UPI PIN, Cards</span>
+            </span>
+            <span id="live-utterance-count" class="font-mono font-bold text-slate-600">0 Utterances</span>
+          </div>
+        </div>
+
+        <!-- Amazon Bedrock Generative AI Summary (Claude 3.5 Sonnet v2) -->
+        <div class="bg-gradient-to-br from-slate-900 via-brand-dark to-slate-950 text-white rounded-3xl p-6 border border-slate-800 shadow-xl space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="bot" class="w-4 h-4 text-brand-teal"></i>
+              <h4 class="font-bold text-xs text-white">Amazon Bedrock Generative AI Summary (Claude 3.5 Sonnet)</h4>
+            </div>
+            <span class="text-[9px] bg-brand-teal/20 text-brand-teal border border-brand-teal/30 px-2 py-0.5 rounded font-extrabold uppercase">
+              CALL_END Event
+            </span>
+          </div>
+
+          <div id="bedrock-summary-box" class="text-xs space-y-2 text-slate-300">
+            <p class="italic text-slate-400 text-[11px]">
+              Generative AI summary and compliance validation will finalize upon call completion...
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT: CALLER'S FULL CRM DATA ASIDE (6 Cols) -->
+      <div class="lg:col-span-6 space-y-6">
+        
+        <!-- Caller 360 Profile Card -->
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <span class="text-[10px] font-extrabold uppercase text-brand-teal tracking-wider block">Customer 360 Screen-Pop</span>
+              <h3 class="text-xl font-bold text-slate-900" id="crm-profile-name">Rajesh Sharma</h3>
+            </div>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800" id="crm-kyc-status">
+              KYC VERIFIED
+            </span>
+          </div>
+
+          <!-- Demographics & Balances -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-100 text-xs">
+            <div>
+              <span class="text-[10px] text-slate-400 font-bold uppercase block">Mobile</span>
+              <span class="font-mono font-bold text-slate-800" id="crm-phone">+91 98201 55412</span>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 font-bold uppercase block">Aadhaar (Masked)</span>
+              <span class="font-mono font-bold text-slate-800" id="crm-aadhaar">XXXX-XXXX-8821</span>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 font-bold uppercase block">PAN Number</span>
+              <span class="font-mono font-bold text-slate-800" id="crm-pan">ABCPS****K</span>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 font-bold uppercase block">Ledger Balance</span>
+              <span class="font-mono font-bold text-emerald-700" id="crm-balance">₹1,24,000.00</span>
+            </div>
+          </div>
+
+          <!-- Context Alert & Authoritative Rule Popup -->
+          <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-amber-900 flex items-center space-x-1.5" id="crm-context-title">
+                <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600"></i>
+                <span>Flagged Operational Rule</span>
+              </span>
+              <span class="text-[10px] font-extrabold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full" id="crm-rule-badge">
+                RBI Guideline
+              </span>
+            </div>
+            <p class="text-slate-800 text-xs leading-relaxed" id="crm-context-desc">
+              Customer called regarding flagged ₹18,500 POS swipe at Croma Electronics Mumbai on Visa Platinum 4419.
+            </p>
+            <div class="p-3 bg-white/90 rounded-xl border border-amber-200 text-[11px] text-slate-800 font-medium">
+              <strong>Authoritative Rule:</strong> <span id="crm-rule-text">RBI 3-Day Zero-Liability Guideline - Rule Circular DBR.No.Leg.BC.78</span>
+            </div>
+          </div>
+
+          <!-- Recommended Script for Agent -->
+          <div class="p-4 rounded-2xl bg-sky-50 border border-sky-100 text-xs space-y-1.5">
+            <span class="text-sky-800 font-bold text-[10px] uppercase flex items-center space-x-1">
+              <i data-lucide="message-square" class="w-3.5 h-3.5 text-sky-600"></i>
+              <span>Recommended Verbatim Script</span>
+            </span>
+            <p class="text-slate-800 italic leading-relaxed text-[11px]" id="crm-verbatim-script">
+              "Mr. Sharma, I see the ₹18,500 POS transaction at Croma Electronics at 14:18 PM. Would you like me to immediately freeze card 4419 while you stay on the line?"
+            </p>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <button id="btn-crm-action-primary" onclick="executeQuickAction('primary')" class="py-2.5 px-4 bg-brand-teal hover:bg-brand-teal/90 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center space-x-2">
+              <i data-lucide="shield-alert" class="w-4 h-4"></i>
+              <span id="label-crm-action-primary">Freeze Card 4419</span>
+            </button>
+            <button id="btn-crm-action-secondary" onclick="executeQuickAction('secondary')" class="py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center space-x-2">
+              <i data-lucide="file-plus" class="w-4 h-4"></i>
+              <span id="label-crm-action-secondary">Log Dispute Ref #DISP-4419</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Active Policies Held by Caller -->
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <h4 class="font-bold text-slate-900 text-sm flex items-center space-x-2">
+              <i data-lucide="shield-check" class="w-4 h-4 text-brand-teal"></i>
+              <span>Active Policies & Coverage Details</span>
+            </h4>
+            <span class="text-xs text-slate-400 font-mono" id="crm-policy-count">1 Plan Active</span>
+          </div>
+
+          <div id="crm-policies-list" class="space-y-2.5">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- 4. JAVASCRIPT: REAL-TIME AGENT ASSIST & CRM LOGIC -->
+  <!-- ========================================================================= -->
+  <script>
+    let audioCtx = null;
+    let ringOsc1 = null;
+    let ringOsc2 = null;
+
+    function startRinging() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ringOsc1) return;
+        ringOsc1 = audioCtx.createOscillator();
+        ringOsc2 = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        ringOsc1.frequency.setValueAtTime(400, audioCtx.currentTime);
+        ringOsc2.frequency.setValueAtTime(450, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+
+        ringOsc1.connect(gain);
+        ringOsc2.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        ringOsc1.start();
+        ringOsc2.start();
+      } catch (e) {}
+    }
+
+    function stopRinging() {
+      try {
+        if (ringOsc1) { ringOsc1.stop(); ringOsc1.disconnect(); ringOsc1 = null; }
+        if (ringOsc2) { ringOsc2.stop(); ringOsc2.disconnect(); ringOsc2 = null; }
+      } catch (e) {}
+    }
+
+    const AgentState = {
+      agentId: 'AGT-101',
+      status: 'available',
+      activeCall: null,
+      callStartTime: null,
+      callTimer: null,
+      webSocket: null,
+      broadcastChannel: null,
+      isMuted: false,
+      isHold: false,
+      utterances: []
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      initBroadcastChannel();
+      initSignalingWebSocket();
+    });
+
+    function initBroadcastChannel() {
+      try {
+        AgentState.broadcastChannel = new BroadcastChannel('bfsi_telephony_channel');
+        AgentState.broadcastChannel.onmessage = (event) => {
+          const msg = event.data;
+          console.log("[BroadcastChannel Inbound]:", msg);
+
+          if (msg.type === 'customer_call_incoming') {
+            onInboundCallReceived(msg.payload);
+          } else if (msg.type === 'customer_hung_up') {
+            stopRinging();
+            endCall();
+          }
+        };
+      } catch (e) {}
+    }
+
+    function initSignalingWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host || 'localhost:8000';
+
+      AgentState.webSocket = new WebSocket(`${protocol}//${host}/ws/signaling/${AgentState.agentId}`);
+
+      AgentState.webSocket.onopen = () => {
+        AgentState.webSocket.send(JSON.stringify({
+          type: 'register',
+          payload: { role: 'agent', name: AgentState.agentId }
+        }));
+      };
+
+      AgentState.webSocket.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        switch (msg.type) {
+          case 'incoming_call':
+            onInboundCallReceived(msg.payload);
+            break;
+          case 'live_speech_utterance':
+            if (msg.payload) {
+              appendSpeechUtterance({
+                speaker: msg.payload.speaker_name || msg.payload.speaker || "Customer",
+                time: msg.payload.timestamp || new Date().toLocaleTimeString(),
+                badge: msg.payload.speaker || "Customer",
+                badge_color: "bg-blue-50 text-blue-700 border-blue-200",
+                text: msg.payload.text,
+                sentiment: detectLiveSentiment(msg.payload.text),
+                sentiment_color: detectSentimentColor(msg.payload.text),
+                pii_redacted: false,
+                ai_suggested_action: generateLiveSuggestion(msg.payload.text)
+              });
+            }
+            break;
+          case 'webrtc_offer':
+            if (msg.payload && msg.payload.sdp) {
+              handleCustomerWebRTCOffer(msg.payload);
+            }
+            break;
+          case 'ice_candidate':
+            if (msg.payload && msg.payload.candidate) {
+              if (AgentState.peerConnection && AgentState.peerConnection.remoteDescription) {
+                AgentState.peerConnection.addIceCandidate(new RTCIceCandidate(msg.payload.candidate))
+                  .catch(e => console.error("[WebRTC] Agent addIceCandidate error:", e));
+              } else {
+                AgentState.iceCandidateQueue = AgentState.iceCandidateQueue || [];
+                AgentState.iceCandidateQueue.push(msg.payload.candidate);
+              }
+            }
+            break;
+          case 'call_ended':
+            stopRinging();
+            endCall();
+            break;
+          case 'lca_utterance':
+            appendSpeechUtterance(msg.payload);
+            break;
+          case 'lca_bedrock_summary':
+            renderBedrockSummary(msg.payload.summary);
+            break;
+        }
+      };
+
+      AgentState.webSocket.onclose = () => {
+        setTimeout(initSignalingWebSocket, 2500);
+      };
+    }
+
+    function onInboundCallReceived(payload) {
+      AgentState.activeCall = payload;
+      startRinging();
+
+      document.getElementById('incoming-caller-name').innerText = payload.customer_name;
+      document.getElementById('incoming-caller-phone').innerText = payload.caller_phone;
+      document.getElementById('incoming-call-modal').classList.remove('hidden');
+
+      fetchCustomerCRM(payload.caller_phone);
+    }
+
+    async function acceptCall() {
+      stopRinging();
+      document.getElementById('incoming-call-modal').classList.add('hidden');
+      document.getElementById('standby-banner').classList.add('hidden');
+      document.getElementById('active-call-workspace').classList.remove('hidden');
+
+      if (AgentState.webSocket && AgentState.activeCall) {
+        AgentState.webSocket.send(JSON.stringify({
+          type: 'accept_call',
+          payload: { call_uuid: AgentState.activeCall.call_uuid }
+        }));
+      }
+
+      if (AgentState.broadcastChannel && AgentState.activeCall) {
+        AgentState.broadcastChannel.postMessage({
+          type: 'agent_accepted_call',
+          call_uuid: AgentState.activeCall.call_uuid,
+          agent_id: AgentState.agentId
+        });
+      }
+
+      startCallTimer();
+      // Start Real-Time Agent Assist Speech Stream
+      startAgentAssistSpeechStream(AgentState.activeCall.caller_phone);
+    }
+
+    function declineCall() {
+      stopRinging();
+      document.getElementById('incoming-call-modal').classList.add('hidden');
+
+      if (AgentState.webSocket && AgentState.activeCall) {
+        AgentState.webSocket.send(JSON.stringify({
+          type: 'reject_call',
+          payload: { call_uuid: AgentState.activeCall.call_uuid }
+        }));
+      }
+
+      if (AgentState.broadcastChannel && AgentState.activeCall) {
+        AgentState.broadcastChannel.postMessage({
+          type: 'agent_rejected_call',
+          call_uuid: AgentState.activeCall.call_uuid
+        });
+      }
+
+      AgentState.activeCall = null;
+    }
+
+    function hangupCurrentCall() {
+      stopRinging();
+      if (AgentState.activeCall) {
+        if (AgentState.webSocket) {
+          AgentState.webSocket.send(JSON.stringify({
+            type: 'hangup_call',
+            payload: { call_uuid: AgentState.activeCall.call_uuid }
+          }));
+        }
+        if (AgentState.broadcastChannel) {
+          AgentState.broadcastChannel.postMessage({
+            type: 'agent_hung_up',
+            call_uuid: AgentState.activeCall.call_uuid
+          });
+        }
+      }
+      endCall();
+    }
+
+    function endCall() {
+      clearInterval(AgentState.callTimer);
+      AgentState.callTimer = null;
+      AgentState.activeCall = null;
+      if (AgentState.speechRecognition) {
+        try { AgentState.speechRecognition.stop(); } catch(e){}
+      }
+      if (AgentState.localStream) {
+        AgentState.localStream.getTracks().forEach(t => t.stop());
+        AgentState.localStream = null;
+      }
+      if (AgentState.peerConnection) {
+        AgentState.peerConnection.close();
+        AgentState.peerConnection = null;
+      }
+
+      document.getElementById('call-active-badge').classList.add('hidden');
+      document.getElementById('incoming-call-modal').classList.add('hidden');
+      document.getElementById('active-call-workspace').classList.add('hidden');
+      document.getElementById('standby-banner').classList.remove('hidden');
+    }
+
+    function startCallTimer() {
+      AgentState.callStartTime = Date.now();
+      document.getElementById('call-active-badge').classList.remove('hidden');
+
+      AgentState.callTimer = setInterval(() => {
+        const sec = Math.floor((Date.now() - AgentState.callStartTime) / 1000);
+        const m = String(Math.floor(sec / 60)).padStart(2, '0');
+        const s = String(sec % 60).padStart(2, '0');
+        const timeStr = `${m}:${s}`;
+        document.getElementById('call-header-timer').innerText = timeStr;
+        document.getElementById('call-box-timer').innerText = timeStr;
+      }, 1000);
+    }
+
+    function toggleMute() {
+      AgentState.isMuted = !AgentState.isMuted;
+      const btn = document.getElementById('btn-agent-mute');
+      if (AgentState.isMuted) {
+        btn.classList.add('bg-rose-600', 'text-white');
+        btn.classList.remove('bg-slate-800', 'text-slate-300');
+      } else {
+        btn.classList.remove('bg-rose-600', 'text-white');
+        btn.classList.add('bg-slate-800', 'text-slate-300');
+      }
+    }
+
+    function toggleHold() {
+      AgentState.isHold = !AgentState.isHold;
+      const btn = document.getElementById('btn-agent-hold');
+      if (AgentState.isHold) {
+        btn.classList.add('bg-amber-600', 'text-white');
+        btn.classList.remove('bg-slate-800', 'text-slate-300');
+      } else {
+        btn.classList.remove('bg-amber-600', 'text-white');
+        btn.classList.add('bg-slate-800', 'text-slate-300');
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // REAL-TIME AGENT ASSIST: LIVE MIC & TWO-WAY WEBSOCKET SPEECH
+    // -------------------------------------------------------------------------
+    function startAgentAssistSpeechStream(phone) {
+      AgentState.utterances = [];
+      const feed = document.getElementById('assist-speech-stream');
+      feed.innerHTML = `
+        <div class="p-3 rounded-2xl bg-teal-50 border border-teal-200 text-teal-800 text-xs flex items-center space-x-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+          <span class="font-bold">🎙️ Live Microphone Connected. Speak now to converse in real time.</span>
+        </div>
+      `;
+      startAgentMic();
+    }
+
+    function startAgentMic() {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) {
+        console.warn("SpeechRecognition not supported in browser.");
+        return;
+      }
+      try {
+        if (AgentState.speechRecognition) {
+          AgentState.speechRecognition.stop();
+        }
+        const rec = new SpeechRec();
+        rec.continuous = true;
+        rec.interimResults = false;
+        rec.lang = 'en-IN';
+
+        rec.onresult = (event) => {
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              const text = event.results[i][0].transcript.trim();
+              if (text) {
+                sendAgentSpeech(text);
+              }
+            }
+          }
+        };
+
+        rec.onerror = (e) => {
+          console.warn("[Agent Mic] Error:", e);
+        };
+
+        rec.onend = () => {
+          if (AgentState.activeCall && !AgentState.isMuted) {
+            try { rec.start(); } catch(e){}
+          }
+        };
+
+        rec.start();
+        AgentState.speechRecognition = rec;
+      } catch (err) {
+        console.error("Agent mic error:", err);
+      }
+    }
+
+    function sendAgentSpeech(text) {
+      appendSpeechUtterance({
+        speaker: "Agent (You)",
+        time: new Date().toLocaleTimeString(),
+        badge: "Agent",
+        badge_color: "bg-teal-50 text-brand-teal border-teal-200",
+        text: text,
+        sentiment: "Neutral / Professional",
+        sentiment_color: "bg-slate-100 text-slate-700",
+        pii_redacted: false,
+        ai_suggested_action: null
+      });
+
+      if (AgentState.webSocket && AgentState.activeCall) {
+        AgentState.webSocket.send(JSON.stringify({
+          type: "live_speech_utterance",
+          payload: {
+            call_uuid: AgentState.activeCall.call_uuid,
+            speaker: "Agent",
+            speaker_name: "Agent Priya Nair",
+            text: text,
+            timestamp: new Date().toLocaleTimeString()
+          }
+        }));
+      }
+    }
+
+    function detectLiveSentiment(text) {
+      const lower = text.toLowerCase();
+      if (/reject|cancel|cheat|dispute|fraud|delay|harass|angry|complaint|worst/i.test(lower)) {
+        return "Frustrated / Escalation Risk";
+      }
+      if (/thanks|thank you|helpful|great|good|appreciate|resolved/i.test(lower)) {
+        return "Positive / Satisfied";
+      }
+      return "Neutral / Informative";
+    }
+
+    function detectSentimentColor(text) {
+      const s = detectLiveSentiment(text);
+      if (s.includes("Frustrated")) return "bg-rose-100 text-rose-800 border-rose-300";
+      if (s.includes("Positive")) return "bg-emerald-100 text-emerald-800 border-emerald-300";
+      return "bg-slate-100 text-slate-700 border-slate-200";
+    }
+
+    function generateLiveSuggestion(text) {
+      const lower = text.toLowerCase();
+      if (/surgery|hospital|cashless|claim/i.test(lower)) {
+        return "Verify Cashless TPA Network approval (Max ₹5,00,000 pre-authorized).";
+      }
+      if (/card|transaction|debit|unauthorized|blocked/i.test(lower)) {
+        return "Initiate Chargeback form CB-409 & freeze compromised card immediately.";
+      }
+      if (/nominee|kyc|address|aadhaar|pan/i.test(lower)) {
+        return "Send DigiLocker e-KYC instant link via SMS.";
+      }
+      return "Listen actively and acknowledge customer request.";
+    }
+
+    const rtcConfig = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
+      ]
+    };
+
+    async function handleCustomerWebRTCOffer(payload) {
+      try {
+        console.log("[WebRTC] Received customer real-voice offer. Capturing agent mic...");
+        AgentState.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+
+        AgentState.peerConnection = new RTCPeerConnection(rtcConfig);
+
+        // Stream customer's real human microphone voice through agent speakers
+        AgentState.peerConnection.ontrack = (event) => {
+          console.log("[WebRTC] Received customer real voice stream!", event.streams);
+          const remoteAudio = document.getElementById('agent-remote-audio');
+          if (remoteAudio) {
+            remoteAudio.srcObject = event.streams[0];
+            remoteAudio.play().catch(e => console.warn("[WebRTC] Agent play err:", e));
+          }
+        };
+
+        // Add agent mic audio tracks to P2P connection
+        AgentState.localStream.getTracks().forEach(track => {
+          AgentState.peerConnection.addTrack(track, AgentState.localStream);
+        });
+
+        // Relay ICE candidates
+        AgentState.peerConnection.onicecandidate = (event) => {
+          if (event.candidate && AgentState.webSocket && AgentState.webSocket.readyState === WebSocket.OPEN) {
+            AgentState.webSocket.send(JSON.stringify({
+              type: 'ice_candidate',
+              payload: {
+                candidate: event.candidate,
+                call_uuid: payload.call_uuid
+              }
+            }));
+          }
+        };
+
+        // Set remote offer from Customer
+        await AgentState.peerConnection.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+
+        // Drain any queued ICE candidates that arrived before the offer
+        if (AgentState.iceCandidateQueue && AgentState.iceCandidateQueue.length > 0) {
+          AgentState.iceCandidateQueue.forEach(c => {
+            AgentState.peerConnection.addIceCandidate(new RTCIceCandidate(c))
+              .catch(e => console.warn("[WebRTC] Agent queued ICE candidate error:", e));
+          });
+          AgentState.iceCandidateQueue = [];
+        }
+
+        // Create and send SDP Answer back
+        const answer = await AgentState.peerConnection.createAnswer();
+        await AgentState.peerConnection.setLocalDescription(answer);
+
+        AgentState.webSocket.send(JSON.stringify({
+          type: 'webrtc_answer',
+          payload: {
+            sdp: answer,
+            call_uuid: payload.call_uuid
+          }
+        }));
+        console.log("[WebRTC] Real-voice answer sent back to customer!");
+      } catch (err) {
+        console.error("[WebRTC] Error handling customer offer:", err);
+      }
+    }
+
+    function appendSpeechUtterance(u) {
+      const feed = document.getElementById('assist-speech-stream');
+      AgentState.utterances.push(u);
+
+      const isAgent = u.speaker === 'agent';
+      const bubbleClass = isAgent 
+        ? 'ml-auto bg-brand-teal text-white rounded-2xl rounded-tr-none' 
+        : 'mr-auto bg-slate-100 text-slate-800 rounded-2xl rounded-tl-none border border-slate-200';
+      const tagText = isAgent ? 'Agent (Priya Nair)' : 'Customer (Insured)';
+      const sentimentBadge = u.sentiment === 'positive' 
+        ? '<span class="text-[9px] bg-emerald-500 text-white px-1.5 py-0.2 rounded font-bold">Positive</span>'
+        : u.sentiment === 'negative' 
+        ? '<span class="text-[9px] bg-rose-500 text-white px-1.5 py-0.2 rounded font-bold">Dispute / Agitated</span>'
+        : '<span class="text-[9px] bg-slate-400 text-white px-1.5 py-0.2 rounded font-bold">Neutral</span>';
+
+      feed.innerHTML += `
+        <div class="max-w-[85%] ${bubbleClass} p-3.5 shadow-sm space-y-1">
+          <div class="flex items-center justify-between text-[10px] opacity-80 mb-1 space-x-2">
+            <span class="font-bold uppercase tracking-wider">${tagText}</span>
+            <div class="flex items-center space-x-1">
+              <span>${u.language}</span>
+              ${sentimentBadge}
+            </div>
+          </div>
+          <p class="text-xs leading-relaxed">${u.text}</p>
+        </div>
+      `;
+
+      // Update Sentiment Gauge
+      const pill = document.getElementById('live-sentiment-pill');
+      if (u.sentiment === 'negative') {
+        pill.innerText = 'CONCERN / DISPUTE';
+        pill.className = 'text-[11px] font-extrabold px-3 py-1 rounded-full bg-rose-100 text-rose-700 uppercase';
+      } else {
+        pill.innerText = 'POSITIVE / SATISFIED';
+        pill.className = 'text-[11px] font-extrabold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 uppercase';
+      }
+
+      feed.scrollTop = feed.scrollHeight;
+      document.getElementById('live-utterance-count').innerText = `${AgentState.utterances.length} Utterances`;
+    }
+
+    function renderBedrockSummary(s) {
+      if (!s) return;
+      const box = document.getElementById('bedrock-summary-box');
+      box.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 text-[11px]">
+          <div class="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700">
+            <span class="text-[9px] text-brand-teal font-extrabold uppercase block">Call Intent & Context</span>
+            <p class="font-bold text-white">${s.call_intent}</p>
+            <p class="text-slate-400 text-[10px] mt-0.5">${s.policy_verification}</p>
+          </div>
+          <div class="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700">
+            <span class="text-[9px] text-emerald-400 font-extrabold uppercase block">Compliance Validation</span>
+            <p class="text-white">${s.rbi_compliance}</p>
+          </div>
+        </div>
+        <div class="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700 text-[11px]">
+          <span class="text-[9px] text-amber-400 font-extrabold uppercase block">Next Best Action & Disposition</span>
+          <p class="text-white font-semibold">${s.actions_taken}</p>
+          <p class="text-slate-300 text-[10px] mt-0.5 italic">${s.next_best_action}</p>
+        </div>
+      `;
+    }
+
+    // -------------------------------------------------------------------------
+    // CRM DATA FETCHING (ASIDE SCREEN-POP)
+    // -------------------------------------------------------------------------
+    async function fetchCustomerCRM(phone) {
+      try {
+        const clean = phone.replace(/\D/g, '').slice(-10);
+        const res = await fetch(`/api/customers/${clean}`);
+        const data = await res.json();
+        renderCallerCRMData(data);
+      } catch (e) {
+        console.error("CRM fetch error:", e);
+      }
+    }
+
+    function renderCallerCRMData(data) {
+      const c = data.customer;
+      document.getElementById('caller-display-name').innerText = c.full_name;
+      document.getElementById('caller-display-phone').innerText = c.phone_e164;
+      document.getElementById('caller-avatar-circle').innerText = c.full_name.split(' ').map(n=>n[0]).join('').substring(0, 2);
+
+      // Right CRM Panel
+      document.getElementById('crm-profile-name').innerText = c.full_name;
+      document.getElementById('crm-kyc-status').innerText = (c.kyc_status || 'VERIFIED').toUpperCase();
+      document.getElementById('crm-phone').innerText = c.phone_e164;
+      document.getElementById('crm-aadhaar').innerText = `XXXX-XXXX-${c.aadhaar_last4}`;
+      document.getElementById('crm-pan').innerText = c.pan_masked;
+      document.getElementById('crm-balance').innerText = `₹${(c.account_balance_paise / 100).toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+
+      customizeScenarioRules(c);
+
+      const polList = document.getElementById('crm-policies-list');
+      polList.innerHTML = '';
+      document.getElementById('crm-policy-count').innerText = `${data.policies.length} Plan${data.policies.length>1?'s':''}`;
+
+      data.policies.forEach(p => {
+        const si = (p.sum_insured_paise / 100).toLocaleString('en-IN');
+        const pr = (p.premium_annual_paise / 100).toLocaleString('en-IN');
+        polList.innerHTML += `
+          <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-[10px] font-mono text-slate-400 font-bold block">${p.policy_number}</span>
+                <h5 class="font-bold text-slate-900">${p.product_name}</h5>
+              </div>
+              <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800">${p.status}</span>
+            </div>
+            <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60">
+              <div><span class="text-slate-400 text-[10px] block">Sum Insured</span><strong class="text-slate-800">₹${si}</strong></div>
+              <div><span class="text-slate-400 text-[10px] block">Annual Premium</span><strong class="text-slate-800">₹${pr}</strong></div>
+              <div><span class="text-slate-400 text-[10px] block">Valid Till</span><strong class="text-slate-800">${p.end_date}</strong></div>
+            </div>
+          </div>
+        `;
+      });
+      lucide.createIcons();
+    }
+
+    function customizeScenarioRules(c) {
+      const desc = document.getElementById('crm-context-desc');
+      const ruleText = document.getElementById('crm-rule-text');
+      const scriptText = document.getElementById('crm-verbatim-script');
+      const actPrimary = document.getElementById('label-crm-action-primary');
+      const actSecondary = document.getElementById('label-crm-action-secondary');
+
+      if (c.phone_e164.includes('9820155412') || c.customer_id === 1) {
+        desc.innerText = "Flagged POS swipe of ₹18,500 at Croma Electronics Mumbai on Visa Platinum 4419.";
+        ruleText.innerText = "RBI Circular DBR.No.Leg.BC.78 — 3-Day Zero-Liability Guideline for unauthorized electronic transactions.";
+        scriptText.innerText = '"Mr. Sharma, I see the ₹18,500 POS transaction at Croma Electronics at 14:18 PM. Would you like me to immediately freeze card 4419 while you stay on the line?"';
+        actPrimary.innerText = "Freeze Card 4419 Now";
+        actSecondary.innerText = "Log Dispute Ref #DISP-4419";
+      } else if (c.phone_e164.includes('9890233120') || c.customer_id === 2) {
+        desc.innerText = "Inquiry: Robotic knee replacement operation at Lilavati Hospital Mumbai under Policy POL-HLTH-6012.";
+        ruleText.innerText = "No Proportionate Deduction Clause: Single Private AC room covered 100%. Knee sub-limit: ₹2,50,000 per joint. Available cover: ₹12,00,000.";
+        scriptText.innerText = '"Dr. Deshpande, under your policy #POL-HLTH-6012, single private AC room has zero deduction. For joint replacement, your policy covers up to ₹2,50,000 per joint, and you have ₹12,00,000 total cover available."';
+        actPrimary.innerText = "Send Cashless Pre-Auth to Lilavati";
+        actSecondary.innerText = "WhatsApp Admission E-Kit";
+      } else if (c.phone_e164.includes('9740122910') || c.customer_id === 3) {
+        desc.innerText = "Inquiry: Whitefield Villa Home Loan HL-40291 closure and collateral title deed handover.";
+        ruleText.innerText = "RBI Floating Rate Loan Mandate: Zero (₹0) Prepayment / Foreclosure penalty. Net payoff: ₹34,29,690. Title deed stored in Bengaluru Vault Box #B-104.";
+        scriptText.innerText = '"Mr. & Mrs. Iyer, your exact closure amount as of today is ₹34,29,690. Per RBI guidelines, there is ZERO foreclosure penalty. Once paid, original title deeds will be released within 15 working days."';
+        actPrimary.innerText = "Generate 5-Day Payoff Letter";
+        actSecondary.innerText = "Request Vault Box #B-104 Retrieval";
+      } else if (c.phone_e164.includes('9665011284') || c.customer_id === 4) {
+        desc.innerText = "Hero Splendor+ insurance lapsed 45 days ago. Requesting renewal quote and NCB retention.";
+        ruleText.innerText = "IRDAI General Regulation 27: 20% NCB discount preserved within 90 days. Mandatory 5-min self-inspection video (>30 days). Renewal total: ₹2,492.";
+        scriptText.innerText = '"Mr. Patil, your 20% NCB is completely safe as you are well within the 90-day window, saving you ₹264. You just need to complete a 5-minute self-inspection video on your phone. Your net renewal amount is ₹2,492 including taxes."';
+        actPrimary.innerText = "Dispatch 5-Min Video KYC Link";
+        actSecondary.innerText = "Send WhatsApp Payment Link";
+      } else if (c.phone_e164.includes('9870055618') || c.customer_id === 5) {
+        desc.innerText = "Factory machinery accident resulting in traumatic index & middle finger amputation under ₹20L PA policy.";
+        ruleText.innerText = "IRDAI PPD Schedule: Loss of Index Finger (14% = ₹2.8L) + Middle Finger (12% = ₹2.4L) = ₹5.20L + 6 wks TTD (₹12k) = ₹5,32,000 total verified payout.";
+        scriptText.innerText = '"Mr. Rao, under your policy\'s Schedule of Benefits, the loss of your index and middle fingers qualifies for a verified payout of ₹5,20,000. Additionally, you are entitled to ₹12,00,00 for your 6 weeks of temporary recovery, bringing your total benefit to ₹5,32,000."';
+        actPrimary.innerText = "Auto-Trigger Claim Ref #CLM-11823";
+        actSecondary.innerText = "Assign Senior Surveyor Deshmukh";
+      }
+    }
+
+    function executeQuickAction(type) {
+      alert("Action recorded per RBI/IRDAI guidelines against PostgreSQL database. Customer SMS notification dispatched.");
+    }
+
+    function onSwitchAgent(agentId) {
+      AgentState.agentId = agentId;
+      const select = document.getElementById('select-agent-identity');
+      const text = select.options[select.selectedIndex].text;
+      document.getElementById('standby-agent-status').innerText = `${text} — Ready to Receive Calls`;
+      initSignalingWebSocket();
+    }
+
+    function onPresenceChange(status) {
+      AgentState.status = status;
+      const dot = document.getElementById('presence-indicator-dot');
+      if (status === 'available') dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+      else if (status === 'on_call') dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+      else dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-400';
+    }
+  </script>
+</body>
+</html>

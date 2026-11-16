@@ -1,0 +1,134 @@
+# =============================================================================
+# CloudifyOps BFSI AI Assist – GitLab CI/CD Pipeline
+# Target: AWS EC2 us-east-1 (t3.medium), No NAT Gateway, Docker Compose stack
+#
+# Required GitLab CI/CD Variables (Settings > CI/CD > Variables):
+#   EC2_PUBLIC_IP          – Elastic IP of the EC2 instance (e.g. 54.210.45.89)
+#   EC2_USER               – SSH user (ubuntu for Ubuntu AMI)
+#   EC2_SSH_PRIVATE_KEY    – PEM private key content (type: File, masked)
+#   POSTGRES_PASSWORD      – PostgreSQL password (masked)
+#   DOMAIN_NAME            – sslip.io domain (e.g. 54-210-45-89.sslip.io)
+#   BEDROCK_MODEL_ID       – Bedrock model ID (optional, has default)
+# =============================================================================
+
+stages:
+  - lint
+  - deploy
+  - verify
+
+# ---------------------------------------------------------------------------
+# STAGE 1: Lint – syntax check Python files (no dependencies needed)
+# ---------------------------------------------------------------------------
+lint:python:
+  stage: lint
+  image: python:3.12-slim
+  script:
+    - echo "=== Python syntax check ==="
+    - python -m py_compile backend/main.py
+    - python -m py_compile backend/database.py
+    - python -m py_compile backend/webrtc_signaling.py
+    - python -m py_compile backend/lca_simulator.py
+    - echo "=== All Python files passed syntax check ==="
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+
+# ---------------------------------------------------------------------------
+# STAGE 2: Deploy – rsync project to EC2 and restart Docker Compose
+# ---------------------------------------------------------------------------
+deploy:ec2:
+  stage: deploy
+  image: alpine:3.19
+  before_script:
+    - apk add --no-cache openssh-client rsync bash
+    - mkdir -p ~/.ssh
+    - echo "$EC2_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H "$EC2_PUBLIC_IP" >> ~/.ssh/known_hosts 2>/dev/null
+    - echo "StrictHostKeyChecking no" >> ~/.ssh/config
+  script:
+    - echo "=== Deploying to EC2 $EC2_PUBLIC_IP ==="
+
+    - ssh -i ~/.ssh/id_rsa "$EC2_USER@$EC2_PUBLIC_IP"
+        "sudo mkdir -p /opt/bfsi-ai-assist && sudo chown ubuntu:ubuntu /opt/bfsi-ai-assist"
+
+    - rsync -avz --delete
+        --exclude='.git'
+        --exclude='__pycache__'
+        --exclude='*.pyc'
+        --exclude='.env'
+        --exclude='bfsi_local.db'
+        --exclude='terraform/.terraform'
+        --exclude='terraform/terraform.tfstate*'
+        -e "ssh -i ~/.ssh/id_rsa"
+        ./ "$EC2_USER@$EC2_PUBLIC_IP:/opt/bfsi-ai-assist/"
+
+    - ssh -i ~/.ssh/id_rsa "$EC2_USER@$EC2_PUBLIC_IP"
+        "cat > /opt/bfsi-ai-assist/.env << 'EOF'
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=$POSTGRES_PASSWORD
+DB_NAME=bfsi_db
+DATABASE_URL=postgresql://postgres:$POSTGRES_PASSWORD@postgres:5432/bfsi_db
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+POSTGRES_DB=bfsi_db
+DOMAIN_NAME=$DOMAIN_NAME
+LETSENCRYPT_EMAIL=admin@cloudifyops.com
+AWS_DEFAULT_REGION=us-east-1
+AWS_REGION=us-east-1
+BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID:-anthropic.claude-3-5-sonnet-20241022-v2:0}
+EOF"
+
+    - ssh -i ~/.ssh/id_rsa "$EC2_USER@$EC2_PUBLIC_IP"
+        "cd /opt/bfsi-ai-assist &&
+         docker compose down --remove-orphans || true &&
+         docker compose build --no-cache backend &&
+         docker compose up -d &&
+         sleep 30 &&
+         docker compose ps"
+
+    - echo "=== Deploy complete ==="
+  environment:
+    name: production
+    url: http://$EC2_PUBLIC_IP
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+
+# ---------------------------------------------------------------------------
+# STAGE 3: Verify – confirm API health and DB tables
+# ---------------------------------------------------------------------------
+verify:health:
+  stage: verify
+  image: alpine:3.19
+  before_script:
+    - apk add --no-cache curl openssh-client bash
+    - mkdir -p ~/.ssh
+    - echo "$EC2_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H "$EC2_PUBLIC_IP" >> ~/.ssh/known_hosts 2>/dev/null
+    - echo "StrictHostKeyChecking no" >> ~/.ssh/config
+  script:
+    - echo "=== Verify: API health check ==="
+    - for i in 1 2 3 4 5; do
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://$EC2_PUBLIC_IP/api/health || echo "000");
+        echo "Attempt $i - HTTP $STATUS";
+        if [ "$STATUS" = "200" ]; then echo "Health OK"; break; fi;
+        if [ "$i" = "5" ]; then echo "Health check FAILED"; exit 1; fi;
+        sleep 30;
+      done
+
+    - echo "=== Verify: PostgreSQL table count ==="
+    - ssh -i ~/.ssh/id_rsa "$EC2_USER@$EC2_PUBLIC_IP"
+        "TABLE_COUNT=\$(docker exec bfsi_postgres psql -U postgres -d bfsi_db -t -c
+          \"SELECT count(*) FROM information_schema.tables WHERE table_schema='public';\" | tr -d ' \n');
+         echo \"Tables: \$TABLE_COUNT\";
+         if [ \"\$TABLE_COUNT\" -lt \"5\" ]; then echo 'Too few tables'; exit 1; fi;
+         echo 'DB verify OK'"
+
+    - echo "=== All verifications passed ==="
+  needs:
+    - deploy:ec2
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+
